@@ -1,0 +1,96 @@
+# fingerd.socket - systemd socket unit for fingerd
+[Unit]
+Description=Finger daemon socket
+Documentation=man:fingerd(8)
+PartOf=fingerd.service
+
+[Socket]
+ListenStream=79
+Accept=false
+SocketUser=root
+SocketGroup=root
+SocketMode=0666
+# Enable IPv6 and IPv4
+BindIPv6Only=both
+# Security options
+FreeBind=true
+# Performance tuning
+Backlog=128
+# Don't delay small packets (good for interactive protocols)
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target
+
+# fingerd.service - systemd service unit for fingerd
+[Unit]
+Description=Finger daemon
+Documentation=man:fingerd(8)
+Requires=fingerd.socket
+After=network.target fingerd.socket
+ConditionPathExists=/usr/sbin/fingerd
+
+[Service]
+Type=notify
+ExecStart=/usr/sbin/fingerd
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+User=root
+Group=root
+# The daemon drops privileges internally
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+AmbientCapabilities=
+NoNewPrivileges=true
+
+# Filesystem isolation
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/
+ReadWritePaths=/var/log
+TemporaryFileSystem=/tmp
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+
+# Network isolation (allow only what's needed)
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+IPAddressAllow=link-local
+IPAddressAllow=multicast
+
+# Process restrictions
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
+# System call filtering
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+SystemCallErrorNumber=EPERM
+
+# Resource limits
+LimitNOFILE=1024
+LimitNPROC=100
+TasksMax=200
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fingerd
+
+[Install]
+WantedBy=multi-user.target
